@@ -67,7 +67,7 @@ def sanitize_text(text, config: SanitizeConfig):
 
     if config.remove_phone:
         logging.info("Removing phone numbers.")
-        # Updated phone number regex - more robust and handles international formats
+        # Updated phone number regex, handles international formats
         text = re.sub(r"\b(?:\+\d{1,3}\s*)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b", config.redact_char, text)
 
     if config.remove_email:
