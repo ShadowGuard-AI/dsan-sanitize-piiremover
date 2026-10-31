@@ -4,7 +4,6 @@ import re
 import os
 import sys
 
-from faker import Faker
 from pydantic import BaseModel, validator, ValidationError
 
 # Configure logging
@@ -31,7 +30,12 @@ class SanitizeConfig(BaseModel):
 
     @validator('output_file')
     def output_file_does_not_exist(cls, v):
-        """Validate that the output file does not exist to prevent accidental overwrites."""
+        """Warn when an existing output file will be overwritten.
+
+        This validator only warns. Refusing a run whose output path
+        resolves to the input path is done in main, where both paths
+        are available together.
+        """
         if os.path.exists(v):
              logging.warning(f"Output file '{v}' already exists.  It will be overwritten.")  # Issue warning, don't halt.
         return v
@@ -56,7 +60,6 @@ def sanitize_text(text, config: SanitizeConfig):
     Sanitizes the given text by removing or replacing PII.
     """
     logging.info("Starting text sanitization.")
-    fake = Faker()  # Instantiate Faker here, it's more efficient.
 
     if config.remove_ssn:
         logging.info("Removing SSNs.")
@@ -73,7 +76,7 @@ def sanitize_text(text, config: SanitizeConfig):
 
     if config.remove_credit_card:
         logging.info("Removing credit card numbers.")
-        text = re.sub(r"\b(?:\d[ -]*?){13,16}\b", config.redact_char, text)
+        text = re.sub(r"\b\d(?:[ -]*\d){12,}\b", config.redact_char, text)
     
     logging.info("Text sanitization complete.")
     return text
@@ -100,6 +103,10 @@ def main():
             config = SanitizeConfig(**config_data)
         except ValidationError as e:
             logging.error(f"Configuration error: {e}")
+            sys.exit(1)
+
+        if os.path.realpath(config.output_file) == os.path.realpath(config.input_file):
+            logging.error("Refusing to run: output path resolves to the input file.")
             sys.exit(1)
 
 
