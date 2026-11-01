@@ -61,6 +61,14 @@ def sanitize_text(text, config: SanitizeConfig):
     """
     logging.info("Starting text sanitization.")
 
+    # The four passes run in the order written, each over the output of the
+    # one before, and the order decides overlaps: a dashed SSN is gone
+    # before the phone pattern can see it, while the phone pattern gets
+    # first claim on any ten digit run inside a longer number, before the
+    # card pass sees what is left. Every pattern is shape only: the card
+    # pattern in particular takes any run of 13 or more digits, so a long
+    # order number is redacted as readily as a card, with no checksum
+    # anywhere in this file.
     if config.remove_ssn:
         logging.info("Removing SSNs.")
         text = re.sub(r"\b\d{3}-\d{2}-\d{4}\b", config.redact_char, text) # SSN regex
@@ -72,6 +80,12 @@ def sanitize_text(text, config: SanitizeConfig):
 
     if config.remove_email:
         logging.info("Removing email addresses.")
+        # redact_char goes to re.sub as a plain string in every pass, so
+        # re.sub reads it as a template: a replacement containing a
+        # backslash sequence is interpreted, and an invalid one raises
+        # instead of redacting. It is also worth knowing that nothing in
+        # sanitize_text counts replacements, so a file with no PII at all
+        # is copied through and reported as a completed sanitization.
         text = re.sub(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", config.redact_char, text)
 
     if config.remove_credit_card:
